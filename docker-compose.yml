@@ -1,0 +1,29 @@
+services:
+  subdub:
+    image: ghcr.io/kmaill/subdub:latest
+    container_name: subdub
+    restart: unless-stopped
+    ports:
+      - "9999:9999"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - JELLYFIN_TOKEN=your_jellyfin_token_here
+    volumes:
+      # Persistent configuration and temporary scratchpad (on physical disk, avoids RAM /tmp)
+      - ./config:/root/.config/subdub
+      - ./cache:/root/.cache/subdub
+
+      # ========================================================================
+      # IMPORTANT: Media volume mapping must be 1:1 identical to Bazarr!
+      # Bazarr sends absolute file paths in webhooks (e.g. /media/movies/Film.mkv).
+      # Subdub needs to see files under the exact same path.
+      # ========================================================================
+      - /sciezka/do/filmow:/sciezka/do/filmow
+      - /sciezka/do/seriali:/sciezka/do/seriali
+
+    # Protect host resources from CPU/RAM spikes
+    deploy:
+      resources:
+        limits:
+          memory: 1200M
