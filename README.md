@@ -6,7 +6,7 @@
 
 > **Lightweight CLI tool and Python microservice that automatically generates and embeds AI voice-over audio tracks into video files (`.mkv`, `.mp4`, `.m4v`, `.mov`).**
 
-Designed for low resource usage and seamless automation within the **Bazarr / Jellyfin ** home media stack. Powered by free Microsoft Edge TTS synthesis, supporting any language available in Edge TTS (such as Polish, Spanish, German, Ukrainian, French, English, and more), with examples configured for Polish voice-over (`pl-PL-MarekNeural`).
+Designed for low resource usage and seamless automation within the **Bazarr / Jellyfin** home media stack. Powered by free Microsoft Edge TTS synthesis, supporting any language available in Edge TTS (such as Polish, Spanish, German, Ukrainian, French, English, and more), with examples configured for Polish voice-over (`pl-PL-MarekNeural`).
 
 ---
 
