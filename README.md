@@ -2,7 +2,7 @@
 
 [![CI/CD](https://github.com/kmaill/subdub/actions/workflows/ci.yml/badge.svg)](https://github.com/kmaill/subdub/actions/workflows/ci.yml)
 
-> **Lekkie narzędzie CLI i mikroserwis w Pythonie (GNU GPLv3) do automatycznego generowania i wtapiania ścieżki lektora AI (TTS) w pliki wideo (`.mkv`, `.mp4`, `.m4v`, `.mov`).**
+> **Lekkie narzędzie CLI i mikroserwis w Pythonie do automatycznego generowania i wtapiania ścieżki lektora AI (TTS) w pliki wideo (`.mkv`, `.mp4`, `.m4v`, `.mov`).**
 
 Zaprojektowane pod niski narzut zasobów oraz pełną automatyzację w ekosystemie **Bazarr / Jellyfin / Plex**.
 
