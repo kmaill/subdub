@@ -70,7 +70,16 @@ def extract_media_path_from_payload(payload: dict[str, Any]) -> tuple[str | None
     subs_path = None
 
     # Check direct fields
-    for key in ("video", "video_path", "episode", "episode_path", "file", "path"):
+    for key in (
+        "video",
+        "video_path",
+        "episode",
+        "episode_path",
+        "movie",
+        "movie_path",
+        "file",
+        "path",
+    ):
         if key in payload and isinstance(payload[key], str) and payload[key].strip():
             video_path = payload[key].strip()
             break
