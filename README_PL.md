@@ -6,7 +6,7 @@
 
 > **Lekkie narzędzie CLI i mikroserwis w Pythonie do automatycznego generowania i wtapiania ścieżki lektora AI w pliki wideo `.mkv`, `.mp4`, `.m4v` oraz `.mov`.**
 
-Zaprojektowane z myślą o minimalnym zużyciu zasobów oraz pełnej automatyzacji w ekosystemie **Bazarr / Jellyfin / Plex**. Działa w oparciu o darmową syntezę Microsoft Edge TTS i obsługuje dowolny język oferowany przez tę usługę, ze szczególnym uwzględnieniem polskiego lektora `pl-PL-MarekNeural`.
+Zaprojektowane z myślą o minimalnym zużyciu zasobów oraz pełnej automatyzacji w ekosystemie **Bazarr / Jellyfin**. Działa w oparciu o darmową syntezę Microsoft Edge TTS i obsługuje dowolny język oferowany przez tę usługę, ze szczególnym uwzględnieniem polskiego lektora `pl-PL-MarekNeural`.
 
 ---
 
