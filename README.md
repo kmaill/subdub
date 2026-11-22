@@ -53,14 +53,19 @@ docker compose up -d
 
 ## Integracja z Bazarr
 
-W Bazarrze przejdź do: **Settings $\to$ Notifications $\to$ Add Notification $\to$ Custom Webhook**:
+Aby Bazarr po pobraniu napisów automatycznie zlecał wygenerowanie lektora:
 
-* **URL:** `json://subdub:9999/webhook` (lub IP hosta: `http://192.168.1.X:9999/webhook`)
-* **Triggers:** Zaznacz `On Subtitles Download`.
+1. W Bazarrze przejdź do: **Settings $\to$ Notifications**.
+2. Kliknij ikonę plusa **(+)** i wybierz typ dostawcy: **JSON**.
+3. W polu **URL** wklej dokładnie poniższy adres:
+   ```text
+   json://subdub:9999/webhook?:path={bazarr_movie_path}{bazarr_episode_path}&:subtitles={bazarr_movie_subtitles}{bazarr_episode_subtitles}
+   ```
+4. Zapisz powiadomienie (**Save**).
 
-Gdy Bazarr pobierze napisy do filmu lub odcinka:
-1. Bazarr wysyła żądanie `POST /webhook`.
-2. Zadanie ląduje w kolejce FIFO, a pojedynczy wątek w tle pobiera napisy, syntetyzuje głos Marka, miksuje dźwięk i podmienia plik.
+Gdy Bazarr pobierze napisy do nowego filmu lub odcinka:
+1. Bazarr wysyła powiadomienie pod wskazany URL, a `subdub` w ułamku sekundy przetwarza je.
+2. Zadanie ląduje w kolejce FIFO, a pojedynczy wątek roboczy w tle syntetyzuje głos Marka, miksuje dźwięk i podmienia plik.
 3. Jellyfin otrzymuje powiadomienie o odświeżeniu biblioteki.
 
 ---
