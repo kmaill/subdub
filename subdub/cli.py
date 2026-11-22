@@ -200,43 +200,29 @@ def main() -> None:
     }
     config = load_config(args.config, **cli_overrides)
 
-    # Acquire instance lock
-    lock_fp = acquire_instance_lock(config.lock_file)
-    if lock_fp is None:
-        logger.info("Another subdub instance is currently active in the background. Exiting.")
-        sys.exit(0)
+    # Mode 1: Webhook server
+    if args.serve:
+        run_server(config)
+        return
 
-    try:
-        # Mode 1: Webhook server
-        if args.serve:
-            run_server(config)
-            return
+    # Mode 2: Directory scan
+    if args.scan:
+        scan_dirs = (
+            config.scan_dirs
+            if args.scan == "DEFAULT"
+            else [args.scan]
+        )
+        exit_code = run_scan_mode(scan_dirs, config, process_all=args.all)
+        sys.exit(exit_code)
 
-        # Mode 2: Directory scan
-        if args.scan:
-            scan_dirs = (
-                config.scan_dirs
-                if args.scan == "DEFAULT"
-                else [args.scan]
-            )
-            exit_code = run_scan_mode(scan_dirs, config, process_all=args.all)
-            sys.exit(exit_code)
+    # Mode 3: Single file
+    if args.video:
+        ok = process_video(args.video, config, explicit_subs=args.subs)
+        sys.exit(0 if ok else 1)
 
-        # Mode 3: Single file
-        if args.video:
-            ok = process_video(args.video, config, explicit_subs=args.subs)
-            sys.exit(0 if ok else 1)
-
-        # No arguments provided
-        parser.print_help()
-        sys.exit(0)
-
-    finally:
-        try:
-            fcntl.flock(lock_fp, fcntl.LOCK_UN)
-            lock_fp.close()
-        except Exception:
-            pass
+    # No arguments provided
+    parser.print_help()
+    sys.exit(0)
 
 
 if __name__ == "__main__":

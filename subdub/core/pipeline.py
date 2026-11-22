@@ -5,9 +5,12 @@ Coordinates pre-flight checks, subtitles, speech synthesis, batched mixing, and 
 
 from __future__ import annotations
 
+import fcntl
 import logging
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
 
 from subdub.config import Config
 from subdub.core.mixer import mix_batched_audio
@@ -24,6 +27,7 @@ def process_video(
     video_path: str | Path,
     config: Config,
     explicit_subs: str | Path | None = None,
+    blocking_lock: bool = False,
 ) -> bool:
     """
     Run the pipeline on a single video file.
@@ -78,55 +82,82 @@ def process_video(
         logger.info(f"[DRY-RUN] Would generate AI voice-over for {v_path.name} ({len(cues)} cues).")
         return True
 
-    with tempfile.TemporaryDirectory(dir=str(temp_base), prefix="subdub_task_") as work_dir:
-        # TTS generation
-        voice_short_name = config.voice.replace("pl-PL-", "").replace("Neural", "")
-        generate_cues_audio(
-            cues=cues,
-            cache_dir=work_dir,
-            voice=config.voice,
-            rate=config.rate,
-            volume=config.volume,
-            pitch=config.pitch,
-            max_concurrency=config.max_tts_concurrency,
+    # Acquire instance lock right before TTS cue generation and audio mixing
+    lock_path = Path(config.lock_file)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    flags = fcntl.LOCK_EX if blocking_lock else (fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    lock_fp = None
+    try:
+        lock_fp = open(lock_path, "w")
+        fcntl.flock(lock_fp, flags)
+    except (BlockingIOError, OSError):
+        logger.info(
+            f"Another subdub job is currently processing media. Skipping {v_path.name} for now."
         )
+        if lock_fp:
+            try:
+                lock_fp.close()
+            except Exception:
+                pass
+        return False
 
-        # Batched mixing
-        is_mp4 = v_path.suffix.lower() in MP4_EXTENSIONS
-        final_audio = mix_batched_audio(
-            video_path=v_path,
-            cues=cues,
-            work_dir=work_dir,
-            layout=info.audio_layout,
-            duration=info.duration,
-            is_mp4=is_mp4,
-            batch_seconds=config.batch_seconds,
-            sample_rate=config.sample_rate,
-            ducking_threshold=config.ducking_threshold,
-            ducking_ratio=config.ducking_ratio,
-            ducking_attack=config.ducking_attack,
-            ducking_release=config.ducking_release,
-        )
-        if not final_audio:
-            logger.error("Audio mixing failed.")
-            return False
+    try:
+        with tempfile.TemporaryDirectory(dir=str(temp_base), prefix="subdub_task_") as work_dir:
+            # TTS generation
+            voice_short_name = config.voice.replace("pl-PL-", "").replace("Neural", "")
+            generate_cues_audio(
+                cues=cues,
+                cache_dir=work_dir,
+                voice=config.voice,
+                rate=config.rate,
+                volume=config.volume,
+                pitch=config.pitch,
+                max_concurrency=config.max_tts_concurrency,
+            )
 
-        # Atomic remux
-        ok = remux_and_replace(
-            video_path=v_path,
-            final_audio=final_audio,
-            temp_dir=work_dir,
-            audio_streams=info.audio_streams,
-            safe_sub_indices=info.safe_sub_indices,
-            layout=info.audio_layout,
-            prefer_mkvmerge=True,
-            voice_name=voice_short_name,
-        )
-        if not ok:
-            return False
+            # Batched mixing
+            is_mp4 = v_path.suffix.lower() in MP4_EXTENSIONS
+            final_audio = mix_batched_audio(
+                video_path=v_path,
+                cues=cues,
+                work_dir=work_dir,
+                layout=info.audio_layout,
+                duration=info.duration,
+                is_mp4=is_mp4,
+                batch_seconds=config.batch_seconds,
+                sample_rate=config.sample_rate,
+                ducking_threshold=config.ducking_threshold,
+                ducking_ratio=config.ducking_ratio,
+                ducking_attack=config.ducking_attack,
+                ducking_release=config.ducking_release,
+            )
+            if not final_audio:
+                logger.error("Audio mixing failed.")
+                return False
 
-    # Notifictaion
-    if config.jellyfin_enabled:
-        notify_jellyfin(config.jellyfin_url, config.jellyfin_token)
+            ok = remux_and_replace(
+                video_path=v_path,
+                final_audio=final_audio,
+                temp_dir=work_dir,
+                audio_streams=info.audio_streams,
+                safe_sub_indices=info.safe_sub_indices,
+                layout=info.audio_layout,
+                prefer_mkvmerge=True,
+                voice_name=voice_short_name,
+            )
+            if not ok:
+                return False
 
-    return True
+        # Notification
+        if config.jellyfin_enabled:
+            notify_jellyfin(config.jellyfin_url, config.jellyfin_token)
+
+        return True
+    finally:
+        if lock_fp:
+            try:
+                fcntl.flock(lock_fp, fcntl.LOCK_UN)
+                lock_fp.close()
+            except Exception:
+                pass

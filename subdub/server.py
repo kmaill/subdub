@@ -50,7 +50,7 @@ class JobQueue:
             video_path, subs_path = item
             logger.info(f"[QUEUE] Starting job: {video_path} (Remaining in queue: {self._q.qsize()})")
             try:
-                process_video(video_path, self.config, explicit_subs=subs_path)
+                process_video(video_path, self.config, explicit_subs=subs_path, blocking_lock=True)
             except Exception as e:
                 logger.error(f"[QUEUE] Error processing {video_path}: {e}", exc_info=True)
             finally:

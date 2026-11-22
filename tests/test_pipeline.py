@@ -58,6 +58,36 @@ class TestPipeline(unittest.TestCase):
         finally:
             dummy_file.unlink(missing_ok=True)
 
+    @patch("subdub.core.pipeline.probe_media")
+    @patch("subdub.core.pipeline.find_or_extract_srt")
+    @patch("subdub.core.pipeline.parse_srt")
+    def test_lock_skip_when_busy(self, mock_parse, mock_find_subs, mock_probe):
+        import fcntl
+        mock_info = MagicMock()
+        mock_info.has_polish_audio = False
+        mock_probe.return_value = mock_info
+        mock_find_subs.return_value = "/tmp/sample.srt"
+        mock_parse.return_value = [{"start": 1.0, "end": 2.0, "text": "Test"}]
+
+        dummy_file = Path("/tmp/dummy_lock.mkv")
+        dummy_file.touch()
+        lock_file = Path("/tmp/test_subdub.lock")
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Pre-lock file to simulate another active rendering job
+        fp = open(lock_file, "w")
+        fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        try:
+            cfg = Config(lock_file=str(lock_file), dry_run=False)
+            res = process_video(dummy_file, cfg, blocking_lock=False)
+            self.assertFalse(res)
+        finally:
+            fcntl.flock(fp, fcntl.LOCK_UN)
+            fp.close()
+            lock_file.unlink(missing_ok=True)
+            dummy_file.unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()
