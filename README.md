@@ -2,25 +2,52 @@
 
 [![CI/CD](https://github.com/kmaill/subdub/actions/workflows/ci.yml/badge.svg)](https://github.com/kmaill/subdub/actions/workflows/ci.yml)
 
-> **Lekkie narzędzie CLI i mikroserwis w Pythonie do automatycznego generowania i wtapiania ścieżki lektora AI (TTS) w pliki wideo (`.mkv`, `.mp4`, `.m4v`, `.mov`).**
+**English** | [Wersja polska](README_PL.md)
 
-Zaprojektowane pod niski narzut zasobów oraz pełną automatyzację w ekosystemie **Bazarr / Jellyfin / Plex**.
+> **Lightweight CLI tool and Python microservice that automatically generates and embeds AI voice-over audio tracks into video files (`.mkv`, `.mp4`, `.m4v`, `.mov`).**
 
----
-
-## Główne możliwości
-
-* **Darmowy lektor AI:** Wykorzystuje syntezę Microsoft Edge TTS (`pl-PL-MarekNeural`).
-* **Mikroskopijne zużycie RAM:** Przetwarzanie audio w 15-minutowych batchach czasowych z obsługą przenoszenia kwestii na łączeniach.
-* **Podwójny tryb pracy:**
-  1. Narzędzie terminalowe CLI (`subdub film.mkv` lub `subdub --scan`).
-  2. Bezobsługowy serwer webhooków (`subdub --serve`) odbierający powiadomienia z Bazaara.
+Designed for low resource usage and seamless automation within the **Bazarr / Jellyfin / Plex** home media stack. Powered by free Microsoft Edge TTS synthesis, supporting any language available in Edge TTS (such as Polish, Spanish, German, Ukrainian, French, English, and more), with examples configured for Polish voice-over (`pl-PL-MarekNeural`).
 
 ---
 
-## Szybki start
+## Features
 
-Najprostszy sposób na uruchomienie obok Bazaara i Jellyfina:
+* **Free AI Voice-Over:** Uses Microsoft Edge TTS models. Supports dozens of languages and voices out of the box (e.g. Spanish, German, Ukrainian, English, French).
+* **Minimal RAM Usage:** Audio is mixed in 15-minute time windows. Boundary carryover eliminates clipped words across batches while keeping very low memory usage even for 3-hour 4K movies.
+* **Smart Audio Ducking:** Automatically compresses and lowers the original soundtrack volume whenever the narrator speaks.
+* **Dual Operation Mode:**
+  1. CLI tool for single video processing or automated library scans.
+  2. Zero-dependency webhook server receiving notifications directly from Bazarr.
+
+---
+
+## How It Works
+
+```text
+ +--------------------+       +---------------------+
+ |  Bazarr (Webhook)  |   OR  |  CLI (Manual/Scan)  |
+ +---------+----------+       +----------+----------+
+           |                             |
+           +-----------> [ FIFO Queue ] <+
+                                |
+                      [ Background Worker ]
+                                |
+          1. Subtitle detection/extraction (SRT) and SDH cleaning
+          2. Parallel TTS synthesis (Edge TTS)
+          3. 15-minute batched audio mixing with ducking
+          4. Safe remux to temporary file and replacement
+                                |
+                                v
+                    +-----------------------+
+                    | Jellyfin Notification |
+                    +-----------------------+
+```
+
+---
+
+## Quick Start (Docker Compose)
+
+The easiest way to run `subdub` alongside Bazarr and Jellyfin:
 
 ```yaml
 services:
@@ -31,48 +58,49 @@ services:
     ports:
       - "9999:9999"
     environment:
-      - JELLYFIN_TOKEN=twoj_token_api_jellyfin
+      - JELLYFIN_TOKEN=your_jellyfin_api_token
     volumes:
       - ./config:/root/.config/subdub
       - ./cache:/root/.cache/subdub
-      # WAŻNE: Ścieżki do multimediów muszą być 1:1 identyczne jak w kontenerze Bazarr!
-      - /sciezka/do/filmow:/sciezka/do/filmow
-      - /sciezka/do/seriali:/sciezka/do/seriali
+      # Important: Media paths must match Bazarr container paths 1:1
+      - /path/to/movies:/path/to/movies
+      - /path/to/tv:/path/to/tv
     deploy:
       resources:
         limits:
           memory: 1200M
 ```
 
-Uruchom:
+Start the container:
 ```bash
 docker compose up -d
 ```
 
 ---
 
-## Integracja z Bazarr
+## Bazarr Integration
 
-Aby Bazarr po pobraniu napisów automatycznie zlecał wygenerowanie lektora:
+To let Bazarr automatically trigger voice-over generation upon subtitle download:
 
-1. W Bazarrze przejdź do: **Settings $\to$ Notifications**.
-2. Kliknij ikonę plusa **(+)** i wybierz typ dostawcy: **JSON**.
-3. W polu **URL** wklej dokładnie poniższy adres:
+1. In Bazarr, navigate to: **Settings $\to$ Notifications**.
+2. Click the plus icon **(+)** and select provider type: **JSON**.
+3. In the **URL** field, paste:
    ```text
    json://subdub:9999/webhook?:path={bazarr_movie_path}{bazarr_episode_path}&:subtitles={bazarr_movie_subtitles}{bazarr_episode_subtitles}
    ```
-4. Zapisz powiadomienie (**Save**).
+4. Save the notification.
 
-Gdy Bazarr pobierze napisy do nowego filmu lub odcinka:
-1. Bazarr wysyła powiadomienie pod wskazany URL, a `subdub` w ułamku sekundy przetwarza je.
-2. Zadanie ląduje w kolejce FIFO, a pojedynczy wątek roboczy w tle syntetyzuje głos Marka, miksuje dźwięk i podmienia plik.
-3. Jellyfin otrzymuje powiadomienie o odświeżeniu biblioteki.
+When Bazarr downloads subtitles:
+1. Bazarr sends a notification to `subdub`.
+2. `subdub` immediately enqueues the job into its FIFO queue.
+3. The background worker synthesizes speech, mixes audio, and replaces the file atomically.
+4. Jellyfin receives an API refresh notification.
 
 ---
 
-## Użycie z linii poleceń
+## Command Line Usage (CLI)
 
-### Instalacja lokalna (Python 3.11+)
+### Local Installation (Python 3.11+)
 
 ```bash
 git clone https://github.com/kmaill/subdub.git
@@ -82,39 +110,41 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-Wymagania systemowe: `ffmpeg` oraz opcjonalnie `mkvtoolnix` (`mkvmerge`).
+System requirements: `ffmpeg` and optionally `mkvtoolnix` (`mkvmerge`).
 
-### Przykłady komend
+### Examples
 
 ```bash
-# Przetworzenie pojedynczego filmu (automatycznie znajdzie napisy obok lub wewnątrz)
-subdub "/sciezka/do/film.mkv"
+# Process a single video (automatically finds external or embedded subtitles)
+subdub "/path/to/movie.mkv"
 
-# Przetworzenie filmu z jawnym wskazaniem pliku napisów
-subdub "/sciezka/do/film.mkv" --subs "/sciezka/do/napisy.srt"
+# Process a video with explicit subtitle file
+subdub "/path/to/movie.mkv" --subs "/path/to/subtitles.srt"
 
-# Wymuszenie dodania lektora (nawet jeśli film posiada już polską ścieżkę)
-subdub "/sciezka/do/film.mkv" --force
+# Force voice-over generation even if target language audio already exists
+subdub "/path/to/movie.mkv" --force
 
-# Skanowanie biblioteki (przetwarza 1 brakujący film i kończy – idealne do crona)
+# Scan library directory (processes 1 missing file and exits, ideal for cron)
 subdub --scan "/media/movies"
 
-# Przeskanowanie całej biblioteki i przetworzenie wszystkich filmów po kolei
+# Scan entire library and process all missing videos sequentially
 subdub --scan "/media/movies" --all
 
-# Uruchomienie serwera webhooków na porcie 9999
+# Launch the webhook server on port 9999
 subdub --serve --port 9999
 ```
 
 ---
 
-## Konfiguracja (`~/.config/subdub/config.toml`)
+## Configuration (`~/.config/subdub/config.toml`)
 
-Przy pierwszym uruchomieniu plik konfiguracyjny tworzy się automatycznie w `~/.config/subdub/config.toml`:
+On first run, the configuration file is created automatically at `~/.config/subdub/config.toml`:
 
 ```toml
 [tts]
+# Voice model (e.g. pl-PL-MarekNeural, es-ES-AlvaroNeural, de-DE-ConradNeural, en-US-GuyNeural)
 voice = "pl-PL-MarekNeural"
+# ISO 639-2 language code for audio metadata in MKV/MP4 (e.g. pol, spa, deu, eng)
 lang = "pol"
 rate = "+0%"
 volume = "+0%"
@@ -147,6 +177,6 @@ token = "env:JELLYFIN_TOKEN"
 
 ---
 
-## Licencja
+## License
 
-Ten projekt jest objęty licencją **GNU General Public License v3.0 (GPLv3)**. Szczegóły w pliku LICENSE.
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See [LICENSE](LICENSE) for details.
