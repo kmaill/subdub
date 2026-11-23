@@ -45,14 +45,15 @@ def process_video(
             v_path,
             bitrate_51=config.bitrate_51,
             bitrate_stereo=config.bitrate_stereo,
+            lang=config.lang,
         )
     except Exception as e:
         logger.error(f"Failed to probe {v_path.name}: {e}")
         return False
 
-    if info.has_polish_audio and not config.force:
+    if info.has_target_audio and not config.force:
         logger.info(
-            f"[SKIP] Video already contains Polish audio (use --force to override): {v_path.name}"
+            f"[SKIP] Video already contains {config.lang} audio (use --force to override): {v_path.name}"
         )
         return True
 
@@ -145,6 +146,7 @@ def process_video(
                 layout=info.audio_layout,
                 prefer_mkvmerge=True,
                 voice_name=voice_short_name,
+                lang=config.lang,
             )
             if not ok:
                 return False

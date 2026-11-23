@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from subdub.core.probe import AudioLayout, MP4_EXTENSIONS
+from subdub.core.languages import resolve_language
 
 logger = logging.getLogger("subdub.remuxer")
 
@@ -23,21 +24,23 @@ def remux_mkv_mkvmerge(
     audio_streams: list[dict[str, Any]],
     layout: AudioLayout,
     voice_name: str = "Marek",
+    lang: str = "pol",
 ) -> bool:
     """Remux MKV container using mkvmerge."""
     unset_defaults: list[str] = []
     for idx_i, s in enumerate(audio_streams):
         tid = s.get("index") if isinstance(s, dict) and "index" in s else (idx_i + 1)
         unset_defaults.extend(["--default-track-flag", f"{tid}:no"])
-
-    track_name = f"Polski (Lektor AI - {voice_name} {layout.title_suffix})"
+    
+    lang_spec = resolve_language(lang)
+    track_name = f"{lang_spec.name} ({lang_spec.voice_label} - {voice_name} {layout.title_suffix})"
     cmd = [
         "mkvmerge",
         "-q",
         "-o", str(output_path),
         *unset_defaults,
         str(video_path),
-        "--language", "0:pol",
+        "--language", f"0:{lang_spec.code_3}",
         "--track-name", f"0:{track_name}",
         "--default-track-flag", "0:yes",
         str(final_audio),
@@ -61,6 +64,7 @@ def remux_ffmpeg(
     layout: AudioLayout,
     is_mp4: bool,
     voice_name: str = "Marek",
+    lang: str = "pol",
 ) -> bool:
     map_args = ["-map", "0:v:0"]
     codec_args = ["-c:v", "copy"]
@@ -71,11 +75,13 @@ def remux_ffmpeg(
 
     new_track_idx = len(audio_streams)
     map_args.extend(["-map", "1:a:0"])
-    track_name = f"Polski (Lektor AI - {voice_name} {layout.title_suffix})"
+
+    lang_spec = resolve_language(lang)
+    track_name = f"{lang_spec.name} ({lang_spec.voice_label} - {voice_name} {layout.title_suffix})"
 
     codec_args.extend([
         f"-c:a:{new_track_idx}", "copy",
-        f"-metadata:s:a:{new_track_idx}", "language=pol",
+        f"-metadata:s:a:{new_track_idx}", f"language={lang_spec.code_3}",
         f"-metadata:s:a:{new_track_idx}", f"title={track_name}",
         f"-disposition:a:{new_track_idx}", "default",
         "-disposition:a:0", "0",
@@ -116,6 +122,7 @@ def remux_and_replace(
     layout: AudioLayout,
     prefer_mkvmerge: bool = True,
     voice_name: str = "Marek",
+    lang: str = "pol",
 ) -> bool:
     v_path = Path(video_path).resolve()
     ext = v_path.suffix.lower()
@@ -136,6 +143,7 @@ def remux_and_replace(
                 audio_streams=audio_streams,
                 layout=layout,
                 voice_name=voice_name,
+                lang=lang,
             )
         else:
             ok = remux_ffmpeg(
@@ -147,6 +155,7 @@ def remux_and_replace(
                 layout=layout,
                 is_mp4=is_mp4,
                 voice_name=voice_name,
+                lang=lang,
             )
 
         if not ok or not temp_local_output.is_file():

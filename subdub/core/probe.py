@@ -11,17 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("subdub.probe")
+from subdub.core.languages import resolve_language, LanguageSpec
 
-POLISH_AUDIO_KEYWORDS = (
-    "lektor",
-    "pldub",
-    "dubbing pl",
-    "polski",
-    "audio pl",
-    "pl dub",
-    "polish",
-)
+logger = logging.getLogger("subdub.probe")
 
 SAFE_SUBTITLE_CODECS = (
     "subrip",
@@ -51,7 +43,7 @@ class MediaInfo:
     streams: list[dict[str, Any]]
     audio_streams: list[dict[str, Any]]
     subtitle_streams: list[dict[str, Any]]
-    has_polish_audio: bool
+    has_target_audio: bool
     audio_layout: AudioLayout
     safe_sub_indices: list[int]
 
@@ -95,21 +87,20 @@ def probe_streams(video_path: str | Path) -> list[dict[str, Any]]:
         return []
 
 
-def check_polish_audio(streams: list[dict[str, Any]]) -> bool:
+def check_audio_language(streams: list[dict[str, Any]], lang_spec: LanguageSpec) -> bool:
     """
-    Check if video already has a Polish audio track.
+    Check if video already has a specified language
     """
     for s in streams:
-        if s.get("codec_type") == "audio":
-            tags = s.get("tags", {})
-            lang = tags.get("language", "").lower()
-            title = tags.get("title", "").lower()
+        if s.get("codec_type") == "audio":                                                                                                                                        
+                tags = s.get("tags", {})
+                lang = tags.get("language", "").lower()
+                title = tags.get("title", "").lower()
 
-            if lang in ["pol", "pl"]:
-                return True
-            if any(kw in title for kw in POLISH_AUDIO_KEYWORDS):
-                return True
-
+                if lang in (lang_spec.code_3, lang_spec.code_2):
+                    return True
+                if any(kw in title for kw in lang_spec.keywords):
+                    return True
     return False
 
 
@@ -146,6 +137,7 @@ def probe_media(
     video_path: str | Path,
     bitrate_51: str = "448k",
     bitrate_stereo: str = "256k",
+    lang: str = "pol",
 ) -> MediaInfo:
     v_path = str(video_path)
     ext = Path(v_path).suffix.lower()
@@ -160,7 +152,8 @@ def probe_media(
     if not audio_streams:
         raise ValueError(f"File {v_path} contains no audio streams.")
 
-    has_polish = check_polish_audio(streams)
+    lang_spec = resolve_language(lang)
+    has_target = check_audio_language(streams, lang_spec)
     layout = determine_audio_layout(audio_streams, is_mp4, bitrate_51, bitrate_stereo)
 
     safe_sub_indices = [
@@ -175,7 +168,7 @@ def probe_media(
         streams=streams,
         audio_streams=audio_streams,
         subtitle_streams=subtitle_streams,
-        has_polish_audio=has_polish,
+        has_target_audio=has_target,
         audio_layout=layout,
         safe_sub_indices=safe_sub_indices,
     )

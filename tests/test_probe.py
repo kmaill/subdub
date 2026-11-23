@@ -1,38 +1,39 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from subdub.core.probe import (
-    check_polish_audio,
+    check_audio_language,
     determine_audio_layout,
     probe_media,
     get_video_duration,
 )
-
+from subdub.core.languages import resolve_language
 
 class TestProbe(unittest.TestCase):
     def test_check_polish_audio_detection(self):
         # Case 1: English only
+        lang_spec = resolve_language("pol")
         eng_streams = [
             {"codec_type": "audio", "tags": {"language": "eng", "title": "Original English"}}
         ]
-        self.assertFalse(check_polish_audio(eng_streams))
+        self.assertFalse(check_audio_language(eng_streams, lang_spec))
 
         # Case 2: Language code 'pol'
         pol_streams = [
             {"codec_type": "audio", "tags": {"language": "pol", "title": "Stereo"}}
         ]
-        self.assertTrue(check_polish_audio(pol_streams))
+        self.assertTrue(check_audio_language(pol_streams, lang_spec))
 
         # Case 3: Title contains 'lektor'
         lektor_streams = [
             {"codec_type": "audio", "tags": {"language": "und", "title": "Polski Lektor AI"}}
         ]
-        self.assertTrue(check_polish_audio(lektor_streams))
+        self.assertTrue(check_audio_language(lektor_streams, lang_spec))
 
         # Case 4: Title contains 'dubbing pl'
         dub_streams = [
             {"codec_type": "audio", "tags": {"language": "und", "title": "Dubbing PL 5.1"}}
         ]
-        self.assertTrue(check_polish_audio(dub_streams))
+        self.assertTrue(check_audio_language(dub_streams, lang_spec))
 
     def test_determine_audio_layout(self):
         # 6 channels on MKV -> 5.1
@@ -80,7 +81,7 @@ class TestProbe(unittest.TestCase):
 
         info = probe_media("test_movie.mkv")
         self.assertEqual(info.duration, 120.0)
-        self.assertFalse(info.has_polish_audio)
+        self.assertFalse(info.has_target_audio)
         self.assertEqual(info.audio_layout.layout, "5.1")
         self.assertEqual(info.safe_sub_indices, [2])
 

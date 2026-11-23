@@ -9,7 +9,7 @@ class TestPipeline(unittest.TestCase):
     @patch("subdub.core.pipeline.probe_media")
     def test_skip_when_polish_audio_present(self, mock_probe):
         mock_info = MagicMock()
-        mock_info.has_polish_audio = True
+        mock_info.has_target_audio = True
         mock_probe.return_value = mock_info
 
         dummy_file = Path("/tmp/dummy_movie.mkv")
@@ -25,7 +25,7 @@ class TestPipeline(unittest.TestCase):
     @patch("subdub.core.pipeline.find_or_extract_srt")
     def test_skip_when_no_subtitles(self, mock_find_subs, mock_probe):
         mock_info = MagicMock()
-        mock_info.has_polish_audio = False
+        mock_info.has_target_audio = False
         mock_info.streams = []
         mock_probe.return_value = mock_info
         mock_find_subs.return_value = None
@@ -44,7 +44,7 @@ class TestPipeline(unittest.TestCase):
     @patch("subdub.core.pipeline.parse_srt")
     def test_dry_run_mode(self, mock_parse, mock_find_subs, mock_probe):
         mock_info = MagicMock()
-        mock_info.has_polish_audio = False
+        mock_info.has_target_audio = False
         mock_probe.return_value = mock_info
         mock_find_subs.return_value = "/tmp/sample.srt"
         mock_parse.return_value = [{"start": 1.0, "end": 2.0, "text": "Test"}]
@@ -64,7 +64,7 @@ class TestPipeline(unittest.TestCase):
     def test_lock_skip_when_busy(self, mock_parse, mock_find_subs, mock_probe):
         import fcntl
         mock_info = MagicMock()
-        mock_info.has_polish_audio = False
+        mock_info.has_target_audio = False
         mock_probe.return_value = mock_info
         mock_find_subs.return_value = "/tmp/sample.srt"
         mock_parse.return_value = [{"start": 1.0, "end": 2.0, "text": "Test"}]

@@ -15,9 +15,11 @@ from pathlib import Path
 
 from subdub.config import load_config
 from subdub.core.pipeline import process_video
-from subdub.core.probe import SUPPORTED_VIDEO_EXTENSIONS, check_polish_audio, probe_streams
+from subdub.core.probe import SUPPORTED_VIDEO_EXTENSIONS, check_audio_language, probe_streams
 from subdub.core.subtitles import find_or_extract_srt
 from subdub.server import run_server
+
+from subdub.core.languages import resolve_language
 
 logger = logging.getLogger("subdub")
 
@@ -49,10 +51,11 @@ def acquire_instance_lock(lock_file_path: str):
         return None
 
 
-def run_scan_mode(dirs: list[str], config, process_all: bool = False) -> int:
+def run_scan_mode(dirs: list[str], config, process_all: bool = False, lang: str = "pol") -> int:
     """
     Scan directories for movies and episodes lacking Polish audio.
     """
+    lang_spec = resolve_language(lang)
     logger.info(f"Scanning directories: {dirs}")
     processed_count = 0
 
@@ -75,8 +78,8 @@ def run_scan_mode(dirs: list[str], config, process_all: bool = False) -> int:
 
                     vpath = os.path.join(root, f)
                     streams = probe_streams(vpath)
-                    has_pol = check_polish_audio(streams)
-                    if has_pol and not config.force:
+                    has_target = check_audio_language(streams, lang_spec)
+                    if has_target and not config.force:
                         continue
 
                     srt_path = find_or_extract_srt(
@@ -112,7 +115,7 @@ def run_scan_mode(dirs: list[str], config, process_all: bool = False) -> int:
                 )
             else:
                 logger.info(
-                    "All items with subtitles already have Polish audio. Nothing to do."
+                    f"All items with subtitles already have {lang_spec.name} audio. Nothing to do."
                 )
             break
 
@@ -137,7 +140,7 @@ def main() -> None:
         "--scan",
         nargs="?",
         const="DEFAULT",
-        help="Scan directory for media without Polish audio (defaults to scan_dirs in config).",
+        help="Scan directory for media without audio (defaults to scan_dirs in config).",
     )
     parser.add_argument(
         "-a", "--all",
@@ -169,7 +172,7 @@ def main() -> None:
     parser.add_argument(
         "-f", "--force",
         action="store_true",
-        help="Process video even if it already contains Polish audio.",
+        help="Process video even if it already contains target audio.",
     )
     parser.add_argument(
         "--dry-run",
@@ -212,7 +215,7 @@ def main() -> None:
             if args.scan == "DEFAULT"
             else [args.scan]
         )
-        exit_code = run_scan_mode(scan_dirs, config, process_all=args.all)
+        exit_code = run_scan_mode(scan_dirs, config, process_all=args.all, lang=config.lang)
         sys.exit(exit_code)
 
     # Mode 3: Single file

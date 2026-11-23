@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from subdub.core.probe import SAFE_SUBTITLE_CODECS
+from subdub.core.languages import resolve_language
 
 logger = logging.getLogger("subdub.subtitles")
 
@@ -136,11 +137,11 @@ def find_or_extract_srt(
     base = v_path.stem
 
     # Check for external subtitles alongside video
+    lang_spec = resolve_language(lang)
     candidates = [
-        v_dir / f"{base}.{lang}.srt",
-        v_dir / f"{base}.pl.srt",
-        v_dir / f"{base}.pol.srt",
-        v_dir / f"{base}.pl.hi.srt",
+        v_dir / f"{base}.{lang_spec.code_3}.srt",
+        v_dir / f"{base}.{lang_spec.code_2}.srt",
+        v_dir / f"{base}.{lang_spec.code_2}.hi.srt",
         v_dir / f"{base}.srt",
     ]
     for cand in candidates:
@@ -149,11 +150,16 @@ def find_or_extract_srt(
             return str(cand)
 
     # Search by glob
-    for cand_str in glob.glob(os.path.join(v_dir, f"{glob.escape(base)}*.pl*.srt")):
-        cand_p = Path(cand_str)
-        if cand_p.is_file() and cand_p.stat().st_size > 10:
-            logger.info(f"Found external subtitles (glob): {cand_p.name}")
-            return str(cand_p)
+    patterns = [
+        v_dir / f"{glob.escape(base)}*.{lang_spec.code_3}*.srt",
+        v_dir / f"{glob.escape(base)}*.{lang_spec.code_2}*.srt",
+    ]
+    for pat in patterns:
+        for cand_str in glob.glob(str(pat)):
+            cand_p = Path(cand_str)
+            if cand_p.is_file() and cand_p.stat().st_size > 10:
+                logger.info(f"Found external subtitles (glob): {cand_p.name}")
+                return str(cand_p)
 
     # Extract embedded subtitle stream via FFmpeg
     lang_codes = {lang.lower(), "pol", "pl"}
@@ -167,13 +173,16 @@ def find_or_extract_srt(
             s_lang = tags.get("language", "").lower()
             s_title = tags.get("title", "").lower()
 
-            if s_lang in lang_codes or "polish" in s_title or "polski" in s_title:
+            valid_langs = {lang_spec.code_3, lang_spec.code_2}                                                                                                                                
+            is_match = (s_lang in valid_langs) or any(kw in s_title for kw in lang_spec.keywords)
+
+            if is_match:
                 s_index = s.get("index")
                 out_srt = Path(temp_dir) / f"extracted_{base}_{s_index}.srt"
                 out_srt.parent.mkdir(parents=True, exist_ok=True)
 
                 logger.info(
-                    f"Extracting embedded Polish subtitles stream {s_index} to temporary file..."
+                    f"Extracting embedded {lang_spec.name} subtitles stream {s_index} to temporary file..."
                 )
                 cmd = [
                     "ffmpeg",
