@@ -6,7 +6,7 @@
 
 > **Lekkie narzędzie CLI i mikroserwis w Pythonie do automatycznego generowania i wtapiania ścieżki lektora AI w pliki wideo `.mkv`, `.mp4`, `.m4v` oraz `.mov`.**
 
-Zaprojektowane z myślą o minimalnym zużyciu zasobów oraz pełnej automatyzacji w ekosystemie **Bazarr / Jellyfin**. Działa w oparciu o darmową syntezę Microsoft Edge TTS i obsługuje dowolny język oferowany przez tę usługę, ze szczególnym uwzględnieniem polskiego lektora `pl-PL-MarekNeural`.
+Zaprojektowane z myślą o minimalnym zużyciu zasobów oraz pełnej automatyzacji w ekosystemie **Bazarr / Radarr / Sonarr / Jellyfin**. Działa w oparciu o darmową syntezę Microsoft Edge TTS i obsługuje dowolny język oferowany przez tę usługę, ze szczególnym uwzględnieniem polskiego lektora `pl-PL-MarekNeural`.
 
 ---
 
@@ -17,7 +17,7 @@ Zaprojektowane z myślą o minimalnym zużyciu zasobów oraz pełnej automatyzac
 * **Inteligentne ściszanie audio:** Automatyczne ściszanie oryginalnej ścieżki dźwiękowej w momentach, gdy lektor czyta kwestie.
 * **Podwójny tryb pracy:**
   1. Narzędzie terminalowe CLI do pojedynczych plików lub wsadowego skanowania biblioteki.
-  2. Bezobsługowy serwer webhooków odbierający powiadomienia z Bazaara.
+  2. Serwer webhooków odbierający powiadomienia z Bazaara, Radarra i Sonarra.
 
 ---
 
@@ -25,7 +25,8 @@ Zaprojektowane z myślą o minimalnym zużyciu zasobów oraz pełnej automatyzac
 
 ```text
  +-------------------+      +--------------------+
- |  Bazarr (Webhook) |  lub |  CLI (Ręczne/Scan) |
+ |  Bazarr / *arr    |  lub |  CLI (Ręczne/Scan) |
+ |  (Webhook)        |      |                    |
  +---------+---------+      +---------+----------+
            |                          |
            +-----------> [ Kolejka FIFO ] <---------+
@@ -47,7 +48,7 @@ Zaprojektowane z myślą o minimalnym zużyciu zasobów oraz pełnej automatyzac
 
 ## Szybki start (Docker Compose)
 
-Najprostszy sposób na uruchomienie obok Bazaara i Jellyfina:
+Najprostszy sposób na uruchomienie obok Bazaara, Radarra, Sonarra i Jellyfina:
 
 ```yaml
 services:
@@ -78,9 +79,13 @@ docker compose up -d
 
 ---
 
-## Integracja z Bazarr
+## Integracja z webhookami
 
-Aby Bazarr po pobraniu napisów automatycznie zlecał wygenerowanie lektora:
+Subdub obsługuje powiadomienia webhook bezpośrednio z **Bazarr**, **Radarr** oraz **Sonarr**.
+
+### Bazarr
+
+Aby zlecić wygenerowanie lektora automatycznie po pobraniu napisów przez Bazaara:
 
 1. W Bazarrze przejdź do: **Settings $\to$ Notifications**.
 2. Kliknij ikonę plusa **(+)** i wybierz typ dostawcy: **JSON**.
@@ -88,13 +93,22 @@ Aby Bazarr po pobraniu napisów automatycznie zlecał wygenerowanie lektora:
    ```text
    json://subdub:9999/webhook?:path={bazarr_movie_path}{bazarr_episode_path}&:subtitles={bazarr_movie_subtitles}{bazarr_episode_subtitles}
    ```
-4. Zapisz powiadomienie.
+4. Zapisz powiadomienie (**Save**).
 
-Przebieg zdarzeń:
-1. Bazarr pobiera napisy i wysyła powiadomienie pod wskazany URL.
-2. `subdub` natychmiast przyjmuje zadanie i odkłada je w kolejce FIFO.
-3. Wątek roboczy w tle generuje mowę, miksuje ścieżkę dźwiękową i podmienia plik.
-4. Jellyfin otrzymuje sygnał odświeżenia biblioteki.
+### Radarr i Sonarr
+
+Aby powiadamiać Subduba natychmiast po zaimportowaniu filmu lub odcinka przez Radarra/Sonarra (przydatne, gdy pliki zawierają już wbudowane napisy w docelowym języku):
+
+1. W Radarrze lub Sonarrze przejdź do: **Settings $\to$ Connect**.
+2. Kliknij ikonę plusa **(+)** i wybierz: **Webhook**.
+3. Skonfiguruj webhooka:
+   * **Name:** `Subdub`
+   * **URL:** `http://subdub:9999/webhook`
+   * **Method:** `POST`
+   * **Zdarzenia (Notification Triggers):**
+     * W **Radarr**: zaznacz **On File Import** oraz **On File Upgrade**.
+     * W **Sonarr**: zaznacz **On Import Complete** oraz **On Upgrade**.
+4. Kliknij **Test** (zaświeci się na zielono z sukcesem) i zapisz powiadomienie (**Save**).
 
 ---
 

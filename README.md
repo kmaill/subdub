@@ -6,7 +6,7 @@
 
 > **Lightweight CLI tool and Python microservice that automatically generates and embeds AI voice-over audio tracks into video files (`.mkv`, `.mp4`, `.m4v`, `.mov`).**
 
-Designed for low resource usage and seamless automation within the **Bazarr / Jellyfin** home media stack. Powered by free Microsoft Edge TTS synthesis, supporting any language available in Edge TTS (such as Polish, Spanish, German, Ukrainian, French, English, and more), with examples configured for Polish voice-over (`pl-PL-MarekNeural`).
+Designed for low resource usage and seamless automation within the **Bazarr / Radarr / Sonarr / Jellyfin** media stack. Powered by free Microsoft Edge TTS synthesis, supporting any language available in Edge TTS (such as Polish, Spanish, German, Ukrainian, French, English, and more), with examples configured for Polish voice-over (`pl-PL-MarekNeural`).
 
 ---
 
@@ -17,7 +17,7 @@ Designed for low resource usage and seamless automation within the **Bazarr / Je
 * **Smart Audio Ducking:** Automatically compresses and lowers the original soundtrack volume whenever the narrator speaks.
 * **Dual Operation Mode:**
   1. CLI tool for single video processing or automated library scans.
-  2. Zero-dependency webhook server receiving notifications directly from Bazarr.
+  2. Webhook server receiving notifications directly from Bazarr, Radarr, or Sonarr.
 
 ---
 
@@ -25,7 +25,8 @@ Designed for low resource usage and seamless automation within the **Bazarr / Je
 
 ```text
  +--------------------+       +---------------------+
- |  Bazarr (Webhook)  |   OR  |  CLI (Manual/Scan)  |
+ |  Bazarr / *arr     |   OR  |  CLI (Manual/Scan)  |
+ |  (Webhook)         |       |                     |
  +---------+----------+       +----------+----------+
            |                             |
            +-----------> [ FIFO Queue ] <+
@@ -47,7 +48,7 @@ Designed for low resource usage and seamless automation within the **Bazarr / Je
 
 ## Quick Start (Docker Compose)
 
-The easiest way to run `subdub` alongside Bazarr and Jellyfin:
+The easiest way to run `subdub` alongside Bazarr, Radarr, Sonarr, and Jellyfin:
 
 ```yaml
 services:
@@ -78,7 +79,11 @@ docker compose up -d
 
 ---
 
-## Bazarr Integration
+## Webhook Integrations
+
+Subdub accepts webhook notifications from **Bazarr**, **Radarr**, and **Sonarr**.
+
+### Bazarr
 
 To let Bazarr automatically trigger voice-over generation upon subtitle download:
 
@@ -90,11 +95,20 @@ To let Bazarr automatically trigger voice-over generation upon subtitle download
    ```
 4. Save the notification.
 
-When Bazarr downloads subtitles:
-1. Bazarr sends a notification to `subdub`.
-2. `subdub` immediately enqueues the job into its FIFO queue.
-3. The background worker synthesizes speech, mixes audio, and replaces the file atomically.
-4. Jellyfin receives an API refresh notification.
+### Radarr & Sonarr
+
+To let Radarr or Sonarr notify Subdub immediately when a movie or episode is imported (useful if files already contain embedded subtitles in the target language):
+
+1. In Radarr or Sonarr, navigate to: **Settings $\to$ Connect**.
+2. Click the plus icon **(+)** and select **Webhook**.
+3. Configure the webhook settings:
+   * **Name:** `Subdub`
+   * **URL:** `http://subdub:9999/webhook`
+   * **Method:** `POST`
+   * **Notification Triggers:**
+     * In **Radarr**: Check **On File Import** and **On File Upgrade**.
+     * In **Sonarr**: Check **On Import Complete** and **On Upgrade**.
+4. Click **Test** (should report success with a green checkmark) and click **Save**.
 
 ---
 
