@@ -27,6 +27,28 @@ class TestServer(unittest.TestCase):
         self.assertEqual(video, "/data/movie.mkv")
         self.assertEqual(subs, "/data/movie.srt")
 
+    def test_extract_media_path_radarr(self):
+        payload = {
+            "eventType": "Download",
+            "movieFile": {"path": "/movies/Movie (2010)/Movie.mkv"}
+        }
+        video, _ = extract_media_path_from_payload(payload)
+        self.assertEqual(video, "/movies/Movie (2010)/Movie.mkv")
+
+    def test_extract_media_path_sonarr_v4(self):
+        payload = {
+            "eventType": "Download",
+            "series": {"path": "/tv/Show"},
+            "episodeFiles": [{"path": "/tv/Show/Season 01/S01E01.mkv"}]
+        }
+        video, _ = extract_media_path_from_payload(payload)
+        self.assertEqual(video, "/tv/Show/Season 01/S01E01.mkv")
+
+    def test_test_event_payload(self):
+        payload = {"eventType": "Test", "instanceName": "Radarr"} 
+        video, _ = extract_media_path_from_payload(payload) 
+        self.assertIsNone(video)
+
 
 if __name__ == "__main__":
     unittest.main()
