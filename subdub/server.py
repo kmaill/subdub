@@ -63,8 +63,7 @@ class JobQueue:
 
 def extract_media_path_from_payload(payload: dict[str, Any]) -> tuple[str | None, str | None]:
     """
-    Extract video path and optional subtitles path from Bazarr.
-    Bazarr variables typically send {{episode}}, {{episodepath}}, {{subtitles}}, or Apprise JSON message.
+    Extract video path and optional subtitles path from Bazarr, Radarr and Sonarr.
     """
     video_path = None
     subs_path = None
@@ -79,6 +78,7 @@ def extract_media_path_from_payload(payload: dict[str, Any]) -> tuple[str | None
         "movie_path",
         "file",
         "path",
+        "folderPath",
     ):
         if key in payload and isinstance(payload[key], str) and payload[key].strip():
             video_path = payload[key].strip()
