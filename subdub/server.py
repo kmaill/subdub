@@ -89,6 +89,13 @@ def extract_media_path_from_payload(payload: dict[str, Any]) -> tuple[str | None
             subs_path = payload[key].strip()
             break
 
+    if not video_path:
+        for nested_key in ("episodeFile", "movieFile", "series", "movie"):
+            nested_obj = payload.get(nested_key)
+            if isinstance(nested_obj, dict) and isinstance(nested_obj.get("path"), str):
+                video_path = nested_obj["path"].strip()
+                break
+    
     # Check JSON notification format
     if not video_path and "message" in payload and isinstance(payload["message"], str):
         msg = payload["message"].strip()
