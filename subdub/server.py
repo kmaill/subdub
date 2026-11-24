@@ -187,7 +187,7 @@ def run_server(config: Config) -> None:
 
     server = ThreadingHTTPServer((host, port), handler_class)
     logger.info(f"Subdub Webhook Server listening on http://{host}:{port}/webhook")
-    logger.info("Ready to accept notifications from Bazarr / Apprise.")
+    logger.info("Ready to accept notifications from Bazarr/Sonarr/Radarr.")
 
     try:
         server.serve_forever()
