@@ -90,14 +90,21 @@ def extract_media_path_from_payload(payload: dict[str, Any]) -> tuple[str | None
             subs_path = payload[key].strip()
             break
 
+
     if not video_path:
-        for nested_key in ("episodeFile", "movieFile", "series", "movie"):
+        # Sonarr handle
+        ep_files = payload.get("episodeFiles")
+        if isinstance(ep_files, list) and ep_files:
+            first_ep = ep_files[0]
+            if isinstance(first_ep, dict) and isinstance(first_ep.get("path"), str):
+                video_path = first_ep["path"].strip()
+
+    if not video_path:
+        # Radarr handler and Sonarr fallback
+        for nested_key in ("episodeFile", "movieFile"):
             nested_obj = payload.get(nested_key)
             if isinstance(nested_obj, dict) and isinstance(nested_obj.get("path"), str):
                 video_path = nested_obj["path"].strip()
-                break
-            if isinstance(nested_obj, dict) and isinstance(nested_obj.get("folderPath"), str): # i think it works
-                video_path = nested_obj["folderPath"].strip()
                 break
     
     # Check JSON notification format
@@ -159,6 +166,21 @@ def make_webhook_handler(job_queue: JobQueue, config: Config):
                 self._send_json_response(400, {"error": f"Invalid JSON payload: {e}"})
                 return
 
+            event_type = str(
+                payload.get("eventType")
+                or payload.get("event_type")
+                or payload.get("event")
+                or ""
+            ).lower()
+            if event_type == "test" or payload.get("test") is True:
+                logger.info("Received Test webhook event from Radarr/Sonarr. Responding with 200 OK.")
+                self._send_json_response(200, {
+                    "status": "ok",
+                    "message": "Test webhook received successfully",
+                    "service": "subdub",
+                })
+                return
+
             video_path, subs_path = extract_media_path_from_payload(payload)
             if not video_path:
                 logger.warning(f"Received webhook with unrecognized payload: {payload}")
@@ -197,7 +219,7 @@ def run_server(config: Config) -> None:
 
     server = ThreadingHTTPServer((host, port), handler_class)
     logger.info(f"Subdub Webhook Server listening on http://{host}:{port}/webhook")
-    logger.info("Ready to accept notifications from Bazarr / Apprise.")
+    logger.info("Ready to accept notifications from Bazarr/Sonarr/Radarr.")
 
     try:
         server.serve_forever()
