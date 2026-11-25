@@ -65,6 +65,8 @@ scan_dirs = [
     "/media/movies",
     "/media/tv"
 ]
+# Directories to exclude from scanning and webhooks notifications (optional)
+exclude_dirs = []
 
 [server]
 # Webhook server configuration for Bazarr
@@ -106,6 +108,7 @@ class Config:
     # Storage and Scanning
     temp_dir: str = ""
     lock_file: str = ""
+    exclude_dirs: list[str] = field(default_factory=list)
     scan_dirs: list[str] = field(default_factory=lambda: ["/media/movies", "/media/tv"])
 
     # Server
@@ -218,6 +221,7 @@ def load_config(config_path: str | Path | None = None, **cli_overrides: Any) -> 
         strip_sdh=subs_section.get("strip_sdh", Config.strip_sdh),
         temp_dir=storage_section.get("temp_dir", ""),
         lock_file=storage_section.get("lock_file", ""),
+        exclude_dirs=storage_section.get("exclude_dirs", []),
         scan_dirs=storage_section.get("scan_dirs", ["/media/movies", "/media/tv"]),
         server_host=server_section.get("host", Config.server_host),
         server_port=int(server_section.get("port", Config.server_port)),
@@ -232,3 +236,16 @@ def load_config(config_path: str | Path | None = None, **cli_overrides: Any) -> 
             setattr(cfg, k, v)
 
     return cfg
+
+def is_path_excluded(path: str, exclude_dirs: list[str]) -> bool:
+    norm_path = os.path.normpath(os.path.abspath(path))
+    for ex in exclude_dirs:
+        if not ex or not ex.strip():
+            continue
+        norm_ex = os.path.normpath(os.path.abspath(ex))
+        try:
+            if os.path.commonpath([norm_path, norm_ex]) == norm_ex:
+                return True
+        except ValueError:
+            continue
+    return False

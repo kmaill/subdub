@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from subdub.config import load_config
+from subdub.config import is_path_excluded, load_config
 from subdub.core.pipeline import process_video
 from subdub.core.probe import SUPPORTED_VIDEO_EXTENSIONS, check_audio_language, probe_streams
 from subdub.core.subtitles import find_or_extract_srt
@@ -56,6 +56,15 @@ def run_scan_mode(dirs: list[str], config, process_all: bool = False, lang: str 
     Scan directories for movies and episodes lacking Polish audio.
     """
     lang_spec = resolve_language(lang)
+    exclude_dirs = config.exclude_dirs
+    active_dirs = []
+    for d in dirs:
+        if is_path_excluded(d, exclude_dirs):
+            logger.info(f"Skipping excluded scan directory: {d}")
+        else:
+            active_dirs.append(d)
+
+    dirs=active_dirs
     logger.info(f"Scanning directories: {dirs}")
     processed_count = 0
 
@@ -66,7 +75,11 @@ def run_scan_mode(dirs: list[str], config, process_all: bool = False, lang: str 
                 logger.debug(f"Scan directory not found: {sdir}")
                 continue
 
-            for root, _, files in os.walk(sdir):
+            for root, dirnames, files in os.walk(sdir):
+                dirnames[:] = [
+                    d for d in dirnames
+                    if not is_path_excluded(os.path.join(root, d), exclude_dirs)
+                ]
                 for f in sorted(files):
                     f_lower = f.lower()
                     if (

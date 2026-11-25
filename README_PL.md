@@ -162,6 +162,7 @@ strip_sdh = true
 [storage]
 temp_dir = ""
 scan_dirs = ["/media/movies", "/media/tv"]
+exclude_dirs = []
 
 [server]
 host = "0.0.0.0"

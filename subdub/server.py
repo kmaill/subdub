@@ -9,11 +9,12 @@ import logging
 import queue
 import sys
 import threading
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from subdub.config import Config
+from subdub.config import Config, is_path_excluded
 from subdub.core.pipeline import process_video
 from subdub.core.probe import SUPPORTED_VIDEO_EXTENSIONS
 
@@ -115,7 +116,7 @@ def extract_media_path_from_payload(payload: dict[str, Any]) -> tuple[str | None
     return video_path, subs_path
 
 
-def make_webhook_handler(job_queue: JobQueue):
+def make_webhook_handler(job_queue: JobQueue, config: Config):
     """Factory to create request handler with injected job queue."""
 
     class WebhookHandler(BaseHTTPRequestHandler):
@@ -166,6 +167,15 @@ def make_webhook_handler(job_queue: JobQueue):
                     "received": payload,
                 })
                 return
+            
+            if is_path_excluded(video_path, config.exclude_dirs):
+                logger.warning(f"Video path '{video_path}' is in excluded directories")
+                self._send_json_response(200, {
+                    "status": "ignored",
+                    "reason": "Video path is in excluded directories",
+                    "received": payload,
+                })
+                return
 
             qsize = job_queue.enqueue(video_path, subs_path)
             logger.info(f"Accepted webhook for '{video_path}' (Queue position: {qsize})")
@@ -183,7 +193,7 @@ def run_server(config: Config) -> None:
     host = config.server_host
     port = config.server_port
     job_queue = JobQueue(config)
-    handler_class = make_webhook_handler(job_queue)
+    handler_class = make_webhook_handler(job_queue, config)
 
     server = ThreadingHTTPServer((host, port), handler_class)
     logger.info(f"Subdub Webhook Server listening on http://{host}:{port}/webhook")
